@@ -10,6 +10,7 @@ resource "azurerm_linux_virtual_machine" "vpn" {
     endpoint      = azurerm_public_ip.vpn.ip_address
     add_client    = file("${path.module}/scripts/add_client.sh")
     remove_client = file("${path.module}/scripts/remove_client.sh")
+    list_clients  = file("${path.module}/scripts/list_clients.sh")
   }), "\r\n", "\n"))
 
   admin_ssh_key {
