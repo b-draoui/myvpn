@@ -2,8 +2,8 @@ resource "azurerm_linux_virtual_machine" "vpn" {
   name                  = "myvpn-tf-vm"
   resource_group_name   = azurerm_resource_group.vpn.name
   location              = azurerm_resource_group.vpn.location
-  size                  = "Standard_B2ats_v2"
-  admin_username        = "b-draoui"
+  size                  = var.vm_size
+  admin_username        = var.admin_username
   network_interface_ids = [azurerm_network_interface.vpn.id]
 
   custom_data = base64encode(replace(templatefile("${path.module}/cloud-init.yaml.tftpl", {
@@ -13,8 +13,8 @@ resource "azurerm_linux_virtual_machine" "vpn" {
   }), "\r\n", "\n"))
 
   admin_ssh_key {
-    username   = "b-draoui"
-    public_key = file(pathexpand("~/.ssh/id_ed25519.pub"))
+    username   = var.admin_username
+    public_key = file(pathexpand(var.ssh_public_key_path))
   }
 
   os_disk {
