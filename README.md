@@ -2,7 +2,7 @@
 
 A personal WireGuard VPN on Azure, deployed with Terraform and cloud-init. I built it to learn networking and security, starting from a VirtualBox lab and ending with a hardened server that rebuilds itself from these files.
 
-The full write-up (lab, Azure, Terraform, threat model, hardening and security tests) is in [docs/MyVPN.pdf](docs/MyVPN.pdf).
+The full write-up (lab, Azure, Terraform, threat model, hardening and security tests) is in [docs/MyVPN.pdf](docs/MyVPN_Technical_Write_Up.pdf).
 
 ## What it does
 
