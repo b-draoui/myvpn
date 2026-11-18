@@ -15,5 +15,5 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "vpn" {
   name     = "myvpn-tf-rg"
-  location = "spaincentral"
+  location = var.location
 }
