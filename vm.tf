@@ -11,6 +11,7 @@ resource "azurerm_linux_virtual_machine" "vpn" {
     add_client    = file("${path.module}/scripts/add_client.sh")
     remove_client = file("${path.module}/scripts/remove_client.sh")
     list_clients  = file("${path.module}/scripts/list_clients.sh")
+    admin_public_key = var.admin_public_key
   }), "\r\n", "\n"))
 
   admin_ssh_key {
@@ -35,5 +36,5 @@ resource "azurerm_linux_virtual_machine" "vpn" {
 }
 
 output "ssh_command" {
-  value = "ssh b-draoui@${azurerm_public_ip.vpn.ip_address}"
+  value = "ssh b-draoui@10.8.0.1"
 }
