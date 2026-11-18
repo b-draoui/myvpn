@@ -36,5 +36,5 @@ resource "azurerm_linux_virtual_machine" "vpn" {
 }
 
 output "ssh_command" {
-  value = "ssh b-draoui@10.8.0.1"
+  value = "ssh ${var.admin_username}@10.8.0.1"
 }
