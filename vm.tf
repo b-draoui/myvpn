@@ -11,6 +11,7 @@ resource "azurerm_linux_virtual_machine" "vpn" {
     add_client    = file("${path.module}/scripts/add_client.sh")
     remove_client = file("${path.module}/scripts/remove_client.sh")
     list_clients  = file("${path.module}/scripts/list_clients.sh")
+    expire_clients = file("${path.module}/scripts/expire_clients.sh")
     admin_public_key = var.admin_public_key
   }), "\r\n", "\n"))
 

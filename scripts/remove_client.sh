@@ -2,7 +2,6 @@
 set -euo pipefail
 
 WG_CONF="/etc/wireguard/wg0.conf"
-CLIENTS_DIR="/etc/wireguard/clients"
 
 if [[ "$EUID" -ne 0 ]]; then
   echo "Please run this script as root (using sudo)." >&2
@@ -40,7 +39,5 @@ awk -v n="# Client: $name" '
   { print }
 ' "$WG_CONF" | cat -s > "$tmp"
 mv "$tmp" "$WG_CONF"
-
-rm -f "$CLIENTS_DIR/${name}.conf"
 
 echo "Client '$name' removed"

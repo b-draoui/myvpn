@@ -5,6 +5,9 @@ packages:
   - wireguard
   - qrencode
   - tcpdump
+  - nftables
+  - unbound
+  - dnsutils
 
 write_files:
   - path: /etc/sysctl.d/99-wireguard.conf
@@ -82,6 +85,7 @@ write_files:
       # Client: admin
       [Peer]
       PublicKey = ${admin_public_key}
+      PresharedKey = ADMIN_PSK
       AllowedIPs = 10.8.0.2/32
 
   - path: /etc/wireguard/myvpn.env
@@ -89,6 +93,95 @@ write_files:
     content: |
       ENDPOINT="${endpoint}:51820"
       CLIENT_ALLOWED_IPS="0.0.0.0/0, ::/0"
+      DNS="10.8.0.1"
+
+  - path: /etc/nftables.d/myvpn.nft
+    content: |
+      table inet myvpn
+      delete table inet myvpn
+
+      table inet myvpn {
+        chain prerouting {
+          type nat hook prerouting priority dstnat; policy accept;
+          iifname "wg0" meta l4proto { tcp, udp } th dport 53 counter redirect
+        }
+        chain input {
+          type filter hook input priority filter; policy drop;
+          iif "lo" accept
+          ct state established,related accept
+          ct state invalid drop
+          udp sport 67 udp dport 68 accept
+          iifname "eth0" udp dport 51820 accept
+          iifname "wg0" ip saddr 10.8.0.2 tcp dport 22 accept
+          iifname "wg0" meta l4proto { tcp, udp } th dport 53 accept
+          ip protocol icmp icmp type { echo-request, destination-unreachable, time-exceeded } accept
+          meta l4proto ipv6-icmp accept
+          counter drop
+        }
+        chain forward {
+          type filter hook forward priority filter; policy accept;
+          iifname "wg0" ip daddr { 10.0.0.0/8, 100.64.0.0/10, 168.63.129.16, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16 } counter drop
+          iifname "wg0" tcp dport { 25, 135, 139, 445, 853 } counter drop
+          iifname "wg0" udp dport { 137, 138, 853 } counter drop
+        }
+      }
+
+  - path: /etc/nftables.conf
+    permissions: '0755'
+    content: |
+      #!/usr/sbin/nft -f
+
+      include "/etc/nftables.d/*.nft"
+
+  - path: /etc/systemd/system/nftables.service.d/override.conf
+    content: |
+      [Service]
+      ExecStop=
+      ExecStop=-/usr/sbin/nft delete table inet myvpn
+
+  - path: /etc/unbound/unbound.conf.d/myvpn.conf
+    content: |
+      server:
+        interface: 10.8.0.1
+        ip-freebind: yes
+        access-control: 10.8.0.0/24 allow
+        hide-identity: yes
+        hide-version: yes
+        tls-cert-bundle: /etc/ssl/certs/ca-certificates.crt
+
+      forward-zone:
+        name: "."
+        forward-tls-upstream: yes
+        forward-addr: 1.1.1.1@853#cloudflare-dns.com
+        forward-addr: 1.0.0.1@853#cloudflare-dns.com
+
+  - path: /etc/systemd/system/expire-clients.service
+    content: |
+      [Unit]
+      Description=Remove expired MyVPN testers
+      After=wg-quick@wg0.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/expire_clients.sh
+
+  - path: /etc/systemd/system/expire-clients.timer
+    content: |
+      [Unit]
+      Description=Check for expired MyVPN testers every day
+
+      [Timer]
+      OnCalendar=daily
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+  - path: /etc/apt/apt.conf.d/52myvpn-reboot
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:00";
 
   - path: /usr/local/sbin/add_client.sh
     permissions: '0755'
@@ -105,13 +198,23 @@ write_files:
     content: |
       ${indent(6, list_clients)}
 
+  - path: /usr/local/sbin/expire_clients.sh
+    permissions: '0755'
+    content: |
+      ${indent(6, expire_clients)}
+
 runcmd:
   - chmod 700 /etc/wireguard
   - sh -c 'umask 077; wg genkey | tee /etc/wireguard/server.key | wg pubkey > /etc/wireguard/server.pub'
+  - 'psk=$(wg genpsk); sed -i "s|^PresharedKey = ADMIN_PSK$|PresharedKey = $psk|" /etc/wireguard/wg0.conf'
   - systemctl disable --now apport || true
   - sysctl --system
   - mkdir -p /run/sshd && sshd -t && systemctl try-reload-or-restart ssh
+  - systemctl daemon-reload
+  - systemctl enable --now nftables
+  - systemctl restart unbound
   - systemctl enable --now wg-quick@wg0
+  - systemctl enable --now expire-clients.timer
 
 power_state:
   mode: reboot
