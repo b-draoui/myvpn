@@ -53,7 +53,13 @@ You need an Azure subscription (Azure for Students works), Terraform, the Azure 
    terraform apply
    ```
 
-   The default size is `Standard_B2ats_v2`, which the Azure for Students free hours cover. If it has no capacity, `-var="vm_size=..."` picks another size, but the paid sizes are billed by the hour.
+   The default size is `Standard_B2ats_v2`, which the Azure for Students free hours cover. If it has no capacity, `-var="vm_size=..."` picks another size, but the paid sizes are billed by the hour. If an apply fails with `AllocationFailed`, Azure can leave an empty VM behind, and the next apply refuses to create one with the same name. Delete it first:
+
+   ```
+   az vm delete -g myvpn-tf-rg -n myvpn-tf-vm --yes
+   az disk list -g myvpn-tf-rg --query "[?diskState=='Unattached'].name" -o tsv
+   az disk delete -g myvpn-tf-rg -n <disk name> --yes
+   ```
 
 3. Get the server's public key and the admin's preshared key without SSH, since port 22 is closed:
 
