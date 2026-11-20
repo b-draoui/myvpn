@@ -25,3 +25,12 @@ variable "ssh_public_key_path" {
 variable "admin_public_key" {
   type = string
 }
+
+variable "image_version" {
+  type    = string
+  default = "24.04.202611170"
+}
+
+variable "alert_email" {
+  type = string
+}

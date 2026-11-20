@@ -12,6 +12,7 @@ resource "azurerm_linux_virtual_machine" "vpn" {
     remove_client = file("${path.module}/scripts/remove_client.sh")
     list_clients  = file("${path.module}/scripts/list_clients.sh")
     expire_clients = file("${path.module}/scripts/expire_clients.sh")
+    watch_peers    = file("${path.module}/scripts/watch_peers.sh")
     admin_public_key = var.admin_public_key
   }), "\r\n", "\n"))
 
@@ -29,7 +30,7 @@ resource "azurerm_linux_virtual_machine" "vpn" {
     publisher = "Canonical"
     offer     = "ubuntu-24_04-lts"
     sku       = "server"
-    version   = "latest"
+    version   = var.image_version
   }
 
   secure_boot_enabled = true

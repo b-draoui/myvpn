@@ -20,24 +20,31 @@ The write-up comes in two parts:
   - DNS goes through the server's own resolver (Unbound), encrypted up to Cloudflare and checked with DNSSEC. DNS queries sent to any other server are redirected to it.
   - Security updates install every day, and the server reboots on its own at 04:00 UTC when a new kernel needs it.
   - Hardened sshd, kernel settings, unused network protocols and core dumps.
+- Monitored:
+  - Packets dropped by the firewall are logged (`myvpn-drop:` in the journal), with a rate limit so a scan can't fill the disk. The journal keeps 14 days and 200 MB at most.
+  - Azure sends an email when someone changes the NSG or uses Run Command on the VM.
+  - A phone notification (ntfy) arrives every time a client connects.
+- The Ubuntu image is pinned to one version, so two deploys of the same commit build the same server.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `main.tf` | Azure provider and resource group |
-| `variables.tf` | Subscription, region, VM size, username, keys |
+| `variables.tf` | Subscription, region, VM size, username, keys, image version, alert email |
 | `network.tf` | Virtual network, subnet, public IP, NSG and network card |
 | `vm.tf` | The Ubuntu 24.04 VM and the cloud-init data |
+| `monitoring.tf` | The email alerts: an action group and two activity log alerts |
 | `cloud-init.yaml.tftpl` | First boot: WireGuard, firewall, DNS resolver, hardening, scripts |
-| `scripts/` | The client scripts: add, remove, list, and the nightly expiry check |
+| `scripts/` | The client scripts (add, remove, list), the nightly expiry check and the connection notifier |
 | `terraform.tfvars.example` | The values to fill in |
+| `backend.tf.example` | Optional: keep the Terraform state in an Azure storage account instead of on your PC |
 
 ## Deploy
 
 You need an Azure subscription (Azure for Students works), Terraform, the Azure CLI, an SSH key pair and the WireGuard app.
 
-1. Clone the repo and fill in `terraform.tfvars`: the subscription ID, a username, and the public key of the WireGuard tunnel that will be the admin. In the WireGuard app, adding an empty tunnel generates that key pair.
+1. Clone the repo and fill in `terraform.tfvars`: the subscription ID, a username, the public key of the WireGuard tunnel that will be the admin, and the email that gets the alerts. In the WireGuard app, adding an empty tunnel generates that key pair.
 
    ```
    git clone https://github.com/b-draoui/myvpn
@@ -61,6 +68,10 @@ You need an Azure subscription (Azure for Students works), Terraform, the Azure 
    az disk delete -g myvpn-tf-rg -n <disk name> --yes
    ```
 
+   If it fails with `MissingSubscriptionRegistration` on the alerts, register the monitoring provider once with `az provider register -n Microsoft.Insights` and apply again.
+
+   After the apply, Azure sends a verification email to the alert address. Until it's confirmed, the alerts fire but no email leaves.
+
 3. Get the server's public key and the admin's preshared key without SSH, since port 22 is closed:
 
    ```
@@ -68,6 +79,14 @@ You need an Azure subscription (Azure for Students works), Terraform, the Azure 
    ```
 
    The preshared key is a secret: don't share or screenshot that output.
+
+   The connection notifications go to a random ntfy topic created at first boot. Get it the same way and subscribe to it in the ntfy app:
+
+   ```
+   az vm run-command invoke -g myvpn-tf-rg -n myvpn-tf-vm --command-id RunShellScript --scripts "cat /etc/myvpn/notify.env" --query "value[0].message" -o tsv
+   ```
+
+   Anyone who knows the topic can read it, so keep it private too. Both Run Commands will trigger the Run Command alert email, which is a good way to check it works.
 
 4. Finish the admin tunnel in the WireGuard app and turn on the kill switch (block untunneled traffic):
 
@@ -95,6 +114,17 @@ You need an Azure subscription (Azure for Students works), Terraform, the Azure 
 
 6. When you're done, `terraform destroy` removes everything.
 
+### Optional: remote state
+
+By default the state stays in `terraform.tfstate` on your PC. To keep it in Azure instead (encrypted, versioned, and locked while an apply runs), create a storage account with shared keys disabled and a `tfstate` container, give yourself the "Storage Blob Data Contributor" role on it, then:
+
+```
+cp backend.tf.example backend.tf
+terraform init -migrate-state
+```
+
+`backend.tf` is in `.gitignore` because it names your storage account.
+
 ## Limits
 
 - The VPN server, and Azure, can see which destinations the traffic goes to. A VPN moves the trust from the ISP to the server but doesn't remove it.
@@ -102,3 +132,4 @@ You need an Azure subscription (Azure for Students works), Terraform, the Azure 
 - A browser using DNS over HTTPS can still reach its own resolver: it looks like normal HTTPS traffic, so the server can't redirect it.
 - IPv6 isn't carried through the tunnel. Clients only avoid IPv6 leaks if their config keeps `::/0` in AllowedIPs and the kill switch on.
 - `terraform.tfstate` contains sensitive values. It's in `.gitignore`, keep it that way.
+- ntfy.sh is a public service: the notification text (client name, tunnel IP, time) passes through it.

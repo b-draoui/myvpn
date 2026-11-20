@@ -1,0 +1,9 @@
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "myvpn-state-rg"
+    storage_account_name = "your-storage-account"
+    container_name       = "tfstate"
+    key                  = "myvpn.tfstate"
+    use_azuread_auth     = true
+  }
+}

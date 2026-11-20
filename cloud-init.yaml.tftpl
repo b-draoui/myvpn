@@ -101,6 +101,10 @@ write_files:
       delete table inet myvpn
 
       table inet myvpn {
+        chain log_drop {
+          limit rate 10/minute burst 20 packets log prefix "myvpn-drop: " level info
+          counter drop
+        }
         chain prerouting {
           type nat hook prerouting priority dstnat; policy accept;
           iifname "wg0" meta l4proto { tcp, udp } th dport 53 counter redirect
@@ -116,13 +120,13 @@ write_files:
           iifname "wg0" meta l4proto { tcp, udp } th dport 53 accept
           ip protocol icmp icmp type { echo-request, destination-unreachable, time-exceeded } accept
           meta l4proto ipv6-icmp accept
-          counter drop
+          jump log_drop
         }
         chain forward {
           type filter hook forward priority filter; policy accept;
-          iifname "wg0" ip daddr { 10.0.0.0/8, 100.64.0.0/10, 168.63.129.16, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16 } counter drop
-          iifname "wg0" tcp dport { 25, 135, 139, 445, 853 } counter drop
-          iifname "wg0" udp dport { 137, 138, 853 } counter drop
+          iifname "wg0" ip daddr { 10.0.0.0/8, 100.64.0.0/10, 168.63.129.16, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16 } counter jump log_drop
+          iifname "wg0" tcp dport { 25, 135, 139, 445, 853 } counter jump log_drop
+          iifname "wg0" udp dport { 137, 138, 853 } counter jump log_drop
         }
       }
 
@@ -177,6 +181,34 @@ write_files:
       [Install]
       WantedBy=timers.target
 
+  - path: /etc/systemd/journald.conf.d/myvpn.conf
+    content: |
+      [Journal]
+      SystemMaxUse=200M
+      MaxRetentionSec=14day
+
+  - path: /etc/systemd/system/watch-peers.service
+    content: |
+      [Unit]
+      Description=Notify when a MyVPN peer connects
+      After=wg-quick@wg0.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/watch_peers.sh
+
+  - path: /etc/systemd/system/watch-peers.timer
+    content: |
+      [Unit]
+      Description=Check for new MyVPN connections every minute
+
+      [Timer]
+      OnCalendar=minutely
+      AccuracySec=5s
+
+      [Install]
+      WantedBy=timers.target
+
   - path: /etc/apt/apt.conf.d/52myvpn-reboot
     content: |
       Unattended-Upgrade::Automatic-Reboot "true";
@@ -203,18 +235,26 @@ write_files:
     content: |
       ${indent(6, expire_clients)}
 
+  - path: /usr/local/sbin/watch_peers.sh
+    permissions: '0755'
+    content: |
+      ${indent(6, watch_peers)}
+
 runcmd:
   - chmod 700 /etc/wireguard
   - sh -c 'umask 077; wg genkey | tee /etc/wireguard/server.key | wg pubkey > /etc/wireguard/server.pub'
   - 'psk=$(wg genpsk); sed -i "s|^PresharedKey = ADMIN_PSK$|PresharedKey = $psk|" /etc/wireguard/wg0.conf'
+  - [sh, -c, 'umask 077; mkdir -p /etc/myvpn; echo "NTFY_URL=\"https://ntfy.sh/myvpn-$(openssl rand -hex 12)\"" > /etc/myvpn/notify.env']
   - systemctl disable --now apport || true
   - sysctl --system
   - mkdir -p /run/sshd && sshd -t && systemctl try-reload-or-restart ssh
   - systemctl daemon-reload
+  - systemctl restart systemd-journald
   - systemctl enable --now nftables
   - systemctl restart unbound
   - systemctl enable --now wg-quick@wg0
   - systemctl enable --now expire-clients.timer
+  - systemctl enable --now watch-peers.timer
 
 power_state:
   mode: reboot
