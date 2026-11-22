@@ -1,11 +1,10 @@
 # MyVPN
 
-A personal WireGuard VPN on Azure, deployed with Terraform and cloud-init. I built it to learn networking and security, starting from a VirtualBox lab and ending with a hardened server that rebuilds itself from these files.
+A ready-to-deploy, self-hosted WireGuard VPN on Azure. MyVPN automates the infrastructure, first-boot provisioning, server hardening and client lifecycle so an operator can deploy a managed VPN instance without assembling every component by hand.
 
-The write-up comes in two parts:
+**Self-hosted deployment:** each operator deploys and owns a separate instance in their own Azure subscription. You are responsible for Azure costs, credentials, access control, updates, backups and ongoing operation. MyVPN is software and deployment automation, not a centrally operated VPN service.
 
-- [MyVPN Server Setup](docs/MyVPN_Server_Setup.pdf): the lab, the WireGuard configuration, Azure, the client scripts and Terraform.
-- [MyVPN Server Security](docs/MyVPN_Server_Security.pdf): the threat model, the hardening and the security tests.
+The **Deployment & Operations Manual** is the primary guide for prerequisites, deployment, administration, security boundaries, troubleshooting and teardown.
 
 ## What it does
 
@@ -23,7 +22,7 @@ The write-up comes in two parts:
 - Monitored:
   - Packets dropped by the firewall are logged (`myvpn-drop:` in the journal), with a rate limit so a scan can't fill the disk. The journal keeps 14 days and 200 MB at most.
   - Azure sends an email when someone changes the NSG or uses Run Command on the VM.
-  - A phone notification (ntfy) arrives every time a client connects.
+  - Connection notifications are provided through ntfy; verify delivery on a clean deployment before relying on them.
 - The Ubuntu image is pinned to one version, so two deploys of the same commit build the same server.
 
 ## Files
