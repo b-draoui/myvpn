@@ -125,7 +125,7 @@ write_files:
         }
         chain forward {
           type filter hook forward priority filter; policy accept;
-          iifname "wg0" ip daddr { 10.0.0.0/8, 100.64.0.0/10, 168.63.129.16, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16 } counter jump log_drop
+          iifname "wg0" ip daddr { 10.0.0.0/8, 100.64.0.0/10, 168.63.129.16, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 240.0.0.0/4 } counter jump log_drop
           iifname "wg0" tcp dport { 25, 135, 139, 445, 853 } counter jump log_drop
           iifname "wg0" udp dport { 137, 138, 853 } counter jump log_drop
         }

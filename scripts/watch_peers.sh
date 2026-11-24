@@ -5,6 +5,10 @@ WG_CONF="/etc/wireguard/wg0.conf"
 STATE="/var/lib/myvpn/handshakes"
 IDLE=180
 
+if [[ ! -f /etc/myvpn/notify.env ]]; then
+  echo "/etc/myvpn/notify.env is missing, no notification sent" >&2
+  exit 1
+fi
 source /etc/myvpn/notify.env
 
 current=$(wg show wg0 latest-handshakes)

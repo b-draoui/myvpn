@@ -14,7 +14,7 @@ variable "vm_size" {
 
 variable "admin_username" {
   type    = string
-  default = "b-draoui"
+  default = "azureuser"
 }
 
 variable "ssh_public_key_path" {

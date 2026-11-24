@@ -1,4 +1,8 @@
-subscription_id = "00000000-0000-0000-0000-000000000000"
-admin_username = "your-username"
+subscription_id  = "00000000-0000-0000-0000-000000000000"
 admin_public_key = "your WireGuard client public key"
-alert_email = "you@example.com"
+alert_email      = "you@example.com"
+
+# Optional: the defaults are in variables.tf
+# admin_username = "azureuser"
+# location       = "spaincentral"
+# vm_size        = "Standard_B2ats_v2"
